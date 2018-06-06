@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
-
+import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,11 +16,15 @@ import org.springframework.integration.annotation.MessagingGateway;
 import org.springframework.integration.dsl.HeaderEnricherSpec;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.IntegrationFlows;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.SubscribableChannel;
+import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+
 
 @EnableBinding({RestGatewayApplication.GatewayChannels.class})
 @SpringBootApplication
@@ -66,6 +70,14 @@ public class RestGatewayApplication {
     public ResponseEntity<String> getUser(@PathVariable("string") String string) {
       return new ResponseEntity<String>(gateway.process(string), HttpStatus.OK);
     }
+  }
+  
+ 
+  @StreamListener(GatewayChannels.TO_UPPERCASE_REQUEST)
+  @SendTo(GatewayChannels.TO_UPPERCASE_REPLY)
+  public Message<?> process(Message<String> request) {
+    return MessageBuilder.withPayload(request.getPayload().toUpperCase())
+        .copyHeaders(request.getHeaders()).build();
   }
 
 }

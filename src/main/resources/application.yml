@@ -4,11 +4,14 @@ spring:
       bindings:
         to-uppercase-request:
           destination: to-uppercase-request
+          group: stream-to-uppercase-request
           producer:
             required-groups: stream-to-uppercase-request
         to-uppercase-reply:
           destination: to-uppercase-reply
           group: gateway-to-uppercase-reply
+          producer:
+           required-groups: gateway-to-uppercase-reply
       kafka:
         binder:
           brokers:
