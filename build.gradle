@@ -30,13 +30,10 @@ ext {
 }
 
 dependencies {
-	compile('org.springframework.boot:spring-boot-starter-integration')
 	compile('org.springframework.boot:spring-boot-starter-web')
-	compile('org.apache.kafka:kafka-streams:1.0.1')
-	compile('org.springframework.cloud:spring-cloud-stream')
 	compile('org.springframework.cloud:spring-cloud-starter-stream-kafka')
 	testCompile('org.springframework.boot:spring-boot-starter-test')
-	testCompile('org.springframework.cloud:spring-cloud-stream-test-support')
+	testCompile('org.springframework.kafka:spring-kafka-test')
 }
 
 dependencyManagement {

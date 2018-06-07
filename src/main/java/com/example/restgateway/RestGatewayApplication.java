@@ -7,12 +7,14 @@ import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
 import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.cloud.stream.messaging.Processor;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.integration.annotation.Gateway;
 import org.springframework.integration.annotation.MessagingGateway;
+import org.springframework.integration.config.IntegrationConverter;
 import org.springframework.integration.dsl.HeaderEnricherSpec;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.IntegrationFlows;
@@ -26,58 +28,76 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 
-@EnableBinding({RestGatewayApplication.GatewayChannels.class})
+@EnableBinding({ RestGatewayApplication.GatewayChannels.class, Processor.class })
 @SpringBootApplication
 public class RestGatewayApplication {
 
-  interface GatewayChannels {
+	interface GatewayChannels {
 
-    String TO_UPPERCASE_REPLY = "to-uppercase-reply";
-    String TO_UPPERCASE_REQUEST = "to-uppercase-request";
+		String TO_UPPERCASE_REPLY = "to-uppercase-reply";
 
-    @Input(TO_UPPERCASE_REPLY)
-    SubscribableChannel toUppercaseReply();
+		String TO_UPPERCASE_REQUEST = "to-uppercase-request";
 
-    @Output(TO_UPPERCASE_REQUEST)
-    MessageChannel toUppercaseRequest();
-  }
+		@Input(TO_UPPERCASE_REPLY)
+		SubscribableChannel toUppercaseReply();
 
-  @MessagingGateway
-  public interface StreamGateway {
-    @Gateway(requestChannel = ENRICH, replyChannel = GatewayChannels.TO_UPPERCASE_REPLY)
-    String process(String payload);
-  }
+		@Output(TO_UPPERCASE_REQUEST)
+		MessageChannel toUppercaseRequest();
+	}
 
-  private static final String ENRICH = "enrich";
+	@MessagingGateway
+	public interface StreamGateway {
 
-  public static void main(String[] args) {
-    SpringApplication.run(RestGatewayApplication.class, args);
-  }
+		@Gateway(requestChannel = ENRICH, replyChannel = GatewayChannels.TO_UPPERCASE_REPLY)
+		String process(String payload);
+	}
 
-  @Bean
-  public IntegrationFlow headerEnricherFlow() {
-    return IntegrationFlows.from(ENRICH).enrichHeaders(HeaderEnricherSpec::headerChannelsToString)
-        .channel(GatewayChannels.TO_UPPERCASE_REQUEST).get();
-  }
+	private static final String ENRICH = "enrich";
 
-  @RestController
-  public class UppercaseController {
-    @Autowired
-    StreamGateway gateway;
+	public static void main(String[] args) {
+		SpringApplication.run(RestGatewayApplication.class, args);
+	}
 
-    @GetMapping(value = "/string/{string}",
-        produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
-    public ResponseEntity<String> getUser(@PathVariable("string") String string) {
-      return new ResponseEntity<String>(gateway.process(string), HttpStatus.OK);
-    }
-  }
-  
- 
-  @StreamListener(GatewayChannels.TO_UPPERCASE_REQUEST)
-  @SendTo(GatewayChannels.TO_UPPERCASE_REPLY)
-  public Message<?> process(Message<String> request) {
-    return MessageBuilder.withPayload(request.getPayload().toUpperCase())
-        .copyHeaders(request.getHeaders()).build();
-  }
+	@Bean
+	@IntegrationConverter
+	public Converter<byte[], String> bytesToStringConverter() {
+		return new Converter<byte[], String>() {
+
+			@Override
+			public String convert(byte[] source) {
+				return new String(source);
+			}
+
+		};
+	}
+
+	@Bean
+	public IntegrationFlow headerEnricherFlow() {
+		return IntegrationFlows.from(ENRICH)
+				.enrichHeaders(HeaderEnricherSpec::headerChannelsToString)
+				.channel(GatewayChannels.TO_UPPERCASE_REQUEST)
+				.get();
+	}
+
+	@RestController
+	public class UppercaseController {
+
+		@Autowired
+		StreamGateway gateway;
+
+		@GetMapping(value = "/string/{string}")
+		public ResponseEntity<String> getUser(@PathVariable("string") String string) {
+			return new ResponseEntity<String>(gateway.process(string), HttpStatus.OK);
+		}
+	}
+
+
+	@StreamListener(Processor.INPUT)
+	@SendTo(Processor.OUTPUT)
+	public Message<?> process(Message<String> request) {
+		return MessageBuilder.withPayload(request.getPayload().toUpperCase())
+				.copyHeaders(request.getHeaders())
+				.build();
+	}
 
 }
